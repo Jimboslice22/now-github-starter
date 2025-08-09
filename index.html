@@ -1,42 +1,141 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset='utf-8' />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-    <style>
-      body {
-        display: flex;
-        padding: 0;
-        margin: 0;
-        width: 100vw;
-        height: 100vh;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        text-align: center;
-      }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spooky Drum Machine</title>
+  <style>
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    #pads {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-gap: 10px;
+      margin-top: 20px;
+    }
+    .pad {
+      width: 100px;
+      height: 100px;
+      background: #222;
+      border: 2px solid #555;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      font-size: 24px;
+    }
+    .pad:active, .pad.playing {
+      background: #444;
+      border-color: #ff7518;
+    }
+  </style>
+</head>
+<body>
+  <h1>Spooky Drum Machine</h1>
+  <div id="pads">
+    <div class="pad" data-key="Q" data-sound="ghost">Q</div>
+    <div class="pad" data-key="W" data-sound="witch">W</div>
+    <div class="pad" data-key="E" data-sound="zombie">E</div>
+    <div class="pad" data-key="A" data-sound="skeleton">A</div>
+    <div class="pad" data-key="S" data-sound="vampire">S</div>
+    <div class="pad" data-key="D" data-sound="thunder">D</div>
+  </div>
+<script>
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-      main {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-        margin-top: 20px;
-      }
+function play(type){
+  const now = audioCtx.currentTime;
+  switch(type){
+    case 'ghost':
+      const ghost = audioCtx.createOscillator();
+      ghost.type='sine';
+      ghost.frequency.setValueAtTime(600, now);
+      ghost.frequency.exponentialRampToValueAtTime(60, now+1);
+      ghost.connect(audioCtx.destination);
+      ghost.start(now);
+      ghost.stop(now+1);
+      break;
+    case 'witch':
+      const witchOsc = audioCtx.createOscillator();
+      const witchGain = audioCtx.createGain();
+      witchOsc.type='sawtooth';
+      witchOsc.frequency.setValueAtTime(300, now);
+      witchGain.gain.setValueAtTime(0, now);
+      witchGain.gain.linearRampToValueAtTime(1, now+0.1);
+      witchGain.gain.linearRampToValueAtTime(0, now+0.6);
+      witchOsc.connect(witchGain).connect(audioCtx.destination);
+      witchOsc.start(now);
+      witchOsc.stop(now+0.6);
+      break;
+    case 'zombie':
+      const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate*0.5, audioCtx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i=0; i<data.length; i++) { data[i] = Math.random()*2-1; }
+      const noise = audioCtx.createBufferSource();
+      noise.buffer=noiseBuffer;
+      const noiseFilter = audioCtx.createBiquadFilter();
+      noiseFilter.type='lowpass'; noiseFilter.frequency.setValueAtTime(100, now);
+      noise.connect(noiseFilter).connect(audioCtx.destination);
+      noise.start(now);
+      noise.stop(now+0.5);
+      break;
+    case 'skeleton':
+      const t = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      t.type='triangle';
+      t.frequency.setValueAtTime(200, now);
+      g.gain.setValueAtTime(1, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now+0.3);
+      t.connect(g).connect(audioCtx.destination);
+      t.start(now);
+      t.stop(now+0.3);
+      break;
+    case 'vampire':
+      const vamp = audioCtx.createOscillator();
+      vamp.type='square';
+      vamp.frequency.setValueAtTime(80, now);
+      vamp.frequency.exponentialRampToValueAtTime(300, now+0.5);
+      vamp.connect(audioCtx.destination);
+      vamp.start(now);
+      vamp.stop(now+0.5);
+      break;
+    case 'thunder':
+      const thunderBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate*1.5, audioCtx.sampleRate);
+      const tb = thunderBuffer.getChannelData(0);
+      for (let i=0;i<tb.length;i++){tb[i]=Math.random()*2-1;}
+      const thunder = audioCtx.createBufferSource();
+      thunder.buffer=thunderBuffer;
+      const thunderFilter = audioCtx.createBiquadFilter();
+      thunderFilter.type='lowpass'; thunderFilter.frequency.setValueAtTime(200, now);
+      thunder.connect(thunderFilter).connect(audioCtx.destination);
+      thunder.start(now);
+      thunder.stop(now+1.5);
+      break;
+  }
+}
 
-      h1, h2 {
-        font-weight: 500;
-        font-size: 32px;
-      }
+function handlePad(e){
+  const key = e.type === 'keydown' ? e.key.toUpperCase() : this.dataset.key;
+  const pad = document.querySelector(`.pad[data-key="${key}"]`);
+  if(!pad) return;
+  const sound = pad.dataset.sound;
+  play(sound);
+  pad.classList.add('playing');
+  setTimeout(()=>pad.classList.remove('playing'),100);
+}
 
-      h2 {
-        font-weight: 300;
-        font-size: 16px;
-      }
-    </style>
-  </head>
-  <body>
-    <img src="first-gh-deployment.svg" alt="First GitHub Deployment" title="First GitHub Deployment" height="50" width="184" />
-    <main>
-      <h1>Congratulations!</h1>
-      <h2>You just made your first GitHub deployment.</h2>
-    </main>
-  </body>
+window.addEventListener('keydown', handlePad);
+document.querySelectorAll('.pad').forEach(p=>p.addEventListener('click', handlePad));
+</script>
+</body>
 </html>
